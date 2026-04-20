@@ -181,21 +181,42 @@ int head_update(const ObjectID *new_commit) {
 
 // ─── TODO: Implement these ───────────────────────────────────────────────────
 
-// Create a new commit from the current staging area.
-//
-// HINTS - Useful functions to call:
-//   - tree_from_index   : writes the directory tree and gets the root hash
-//   - head_read         : gets the parent commit hash (if any)
-//   - pes_author        : retrieves the author name string (from pes.h)
-//   - time(NULL)        : gets the current unix timestamp
-//   - commit_serialize  : converts the filled Commit struct to a text buffer
-//   - object_write      : saves the serialized text as OBJ_COMMIT
-//   - head_update       : moves the branch pointer to your new commit
-//
-// Returns 0 on success, -1 on error.
+// ─── IMPLEMENTED ─────────────────────────────────────────────────────────────
+
 int commit_create(const char *message, ObjectID *commit_id_out) {
-    // TODO: Implement commit creation
-    // (See Lab Appendix for logical steps)
-    (void)message; (void)commit_id_out;
-    return -1;
+    Commit commit;
+    memset(&commit, 0, sizeof(commit));
+
+    // Step 1: Build the tree from the current index → get root tree hash
+    if (tree_from_index(&commit.tree) < 0) {
+        fprintf(stderr, "error: nothing staged to commit\n");
+        return -1;
+    }
+
+    // Step 2: Read HEAD to get parent commit (may fail for very first commit)
+    ObjectID parent_id;
+    if (head_read(&parent_id) == 0) {
+        commit.has_parent = 1;
+        commit.parent = parent_id;
+    } else {
+        commit.has_parent = 0; // first commit — no parent
+    }
+
+    // Step 3: Fill in author, timestamp, message
+    snprintf(commit.author, sizeof(commit.author), "%s", pes_author());
+    commit.timestamp = (uint64_t)time(NULL);
+    snprintf(commit.message, sizeof(commit.message), "%s", message);
+
+    // Step 4: Serialize the commit struct into a text buffer
+    void *data;
+    size_t len;
+    if (commit_serialize(&commit, &data, &len) < 0) return -1;
+
+    // Step 5: Write the commit object to the object store
+    int rc = object_write(OBJ_COMMIT, data, len, commit_id_out);
+    free(data);
+    if (rc < 0) return -1;
+
+    // Step 6: Update HEAD so the branch points to our new commit
+    return head_update(commit_id_out);
 }

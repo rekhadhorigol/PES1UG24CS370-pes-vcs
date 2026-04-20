@@ -168,9 +168,10 @@ int object_read(const ObjectID *id, ObjectType *type_out, void **data_out, size_
     // Step 6: Copy data portion (after the '\0') into output buffer
     char *data_start = null_pos + 1;
     size_t data_len = (size_t)file_size - (size_t)(data_start - buf);
-    char *out = malloc(data_len);
+    char *out = malloc(data_len + 1);   //+1 for null terminator safety
     if (!out) { free(buf); return -1; }
     memcpy(out, data_start, data_len);
+    out[data_len] = '\0'; // null-terminate for safe string parsing
 
     *data_out = out;
     *len_out = data_len;
